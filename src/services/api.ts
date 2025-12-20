@@ -1,5 +1,9 @@
-export const API_URL = process.env.API_URL!;
-export const WS_URL = process.env.WS_URL!;
+export const API_URL = import.meta.env.VITE_API_URL;
+export const WS_URL = import.meta.env.VITE_WS_URL;
+
+if (!API_URL || !WS_URL) {
+  throw new Error("API_URL or WS_URL is not defined");
+}
 
 class ApiClient {
   private getHeaders(includeAuth: boolean = true): HeadersInit {
