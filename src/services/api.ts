@@ -1,5 +1,5 @@
-export const API_URL = "http://localhost:3012";
-export const WS_URL = "ws://localhost:3012";
+export const API_URL = process.env.API_URL!;
+export const WS_URL = process.env.WS_URL!;
 
 class ApiClient {
   private getHeaders(includeAuth: boolean = true): HeadersInit {
