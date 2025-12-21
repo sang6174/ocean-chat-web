@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { createContext, useState, useEffect, type ReactNode, useCallback, useRef } from 'react';
 import { chatService } from '../services/chatService';
 import { websocketService } from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
@@ -300,12 +300,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     websocketService.on('message.created', handleNewMessage);
     websocketService.on('conversation.created', handleNewConversation);
+    websocketService.on('conversation.added.participants', handleNewConversation);
     websocketService.on('notification.add.friend', handleFriendRequest);
     websocketService.on('notification.accepted.friend', handleFriendAccepted);
 
     return () => {
       websocketService.off('message.created', handleNewMessage);
       websocketService.off('conversation.created', handleNewConversation);
+      websocketService.off('conversation.added.participants', handleNewConversation);
       websocketService.off('notification.add.friend', handleFriendRequest);
       websocketService.off('notification.accepted.friend', handleFriendAccepted);
     };
