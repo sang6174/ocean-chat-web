@@ -27,7 +27,7 @@ export function MessageInput() {
     try {
       await sendMessage({
         conversationId: selectedConversation,
-        message: message.trim(),
+        content: message.trim(),
       });
       setMessage('');
       setShowEmojiPicker(false);

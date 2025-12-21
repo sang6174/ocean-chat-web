@@ -41,7 +41,7 @@ export function ConversationList({ onNewChat }: ConversationListProps) {
     if (conv.type === 'group') {
       return conv.metadata.name;
     }
-    const otherUser = conv.participants.find(p => p.id !== currentUser?.id);
+    const otherUser = conv.participants.find(p => p.userId !== currentUser?.id);
     return otherUser?.username || conv.participants[0]?.username || 'Unknown';
   };
 
@@ -134,7 +134,7 @@ export function ConversationList({ onNewChat }: ConversationListProps) {
                     {getConversationName(conv)}
                   </h3>
                   <p className="conversation-last-message">
-                    {conv.lastMessage?.message || 'No messages yet'}
+                    {conv.lastMessage?.content || 'No messages yet'}
                   </p>
                 </div>
               </div>

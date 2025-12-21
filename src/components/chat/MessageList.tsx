@@ -31,7 +31,7 @@ export function MessageList() {
               {msg.sender.id !== currentUser?.id && (
                 <p className="message-sender">{msg.sender.username}</p>
               )}
-              <p className="message-text">{msg.message}</p>
+              <p className="message-text">{msg.content}</p>
             </div>
           </div>
         ))

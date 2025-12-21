@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Check, UserPlus, MessageSquare, UserCheck } from 'lucide-react';
+import { useState } from 'react';
+import { X, Check, UserPlus, UserCheck } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/common/Avatar';
@@ -10,7 +10,7 @@ interface NewChatModalProps {
 }
 
 export function NewChatModal({ onClose }: NewChatModalProps) {
-  const { users, createConversation, sendFriendRequest, conversations, selectConversation } = useChat();
+  const { users, createConversation, sendFriendRequest, conversations } = useChat();
   const { currentUser } = useAuth();
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
@@ -52,7 +52,7 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
     (conversations || [])
       .filter(c => c.type === 'direct')
       .flatMap(c => c.participants)
-      .map(p => p.id)
+      .map(p => p.userId)
   );
 
   // Show ALL users except current user (don't filter friends)

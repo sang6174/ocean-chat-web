@@ -4,20 +4,19 @@ import { useChat } from '../../hooks/useChat';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/common/Avatar';
 import { Button } from '../../components/common/Button';
-import { chatService } from '../../services/chatService';
 
 interface AddParticipantsModalProps {
   onClose: () => void;
 }
 
 export function AddParticipantsModal({ onClose }: AddParticipantsModalProps) {
-  const { users, conversations, selectedConversation, loadConversations, addParticipants } = useChat();
+  const { users, conversations, selectedConversation, addParticipants } = useChat();
   const { currentUser } = useAuth();
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const conversation = (conversations || []).find(c => c.id === selectedConversation);
-  const existingParticipantIds = conversation?.participants.map(p => p.id) || [];
+  const existingParticipantIds = conversation?.participants.map(p => p.userId) || [];
 
   const availableUsers = (users || []).filter(
     u => u.id !== currentUser?.id && !existingParticipantIds.includes(u.id)

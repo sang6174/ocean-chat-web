@@ -57,14 +57,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const participants = data.participantIds.map(id => {
         const user = users.find(u => u.id === id);
         return {
-          id,
+          userId: id,
           username: user?.username || "Unknown"
         };
       });
 
       // Add current user to participants
       participants.push({
-        id: currentUser.id,
+        userId: currentUser.id,
         username: currentUser.username
       });
 
@@ -92,7 +92,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // Create optimistic message
     const optimisticMessage: Message = {
       id: "temp-" + Date.now(),
-      message: data.message,
+      content: data.content,
       sender: {
         id: currentUser.id,
         username: currentUser.username,
@@ -111,7 +111,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           id: currentUser.id,
           username: currentUser.username,
         },
-        message: data.message,
+        content: data.content,
       });
       // Don't need to do anything else if successful, as we already updated UI.
     } catch (error) {
@@ -163,7 +163,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const participants = participantIds.map(id => {
         const user = users.find(u => u.id === id);
         return {
-          id,
+          userId: id,
           username: user?.username || "Unknown"
         };
       });
@@ -240,7 +240,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           id: senderId,
           username: senderUsername,
         },
-        message: content,
+        content: content,
         createdAt: new Date().toISOString()
       };
 

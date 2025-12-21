@@ -3,7 +3,7 @@ import type { NotificationItem } from "../components/common/NotificationDropdown
 
 export interface Message {
   id: string;
-  message: string;
+  content: string;
   sender: {
     id: string;
     username: string;
@@ -19,7 +19,7 @@ export interface Conversation {
     name: string;
   };
   participants: Array<{
-    id: string;
+    userId: string;
     username: string;
   }>;
   lastMessage?: Message;
@@ -33,7 +33,7 @@ export interface CreateConversationData {
 
 export interface SendMessageData {
   conversationId: string;
-  message: string;
+  content: string;
 }
 
 export interface ChatContextType {

@@ -20,7 +20,7 @@ export function ChatHeader({ onAddParticipants }: ChatHeaderProps) {
     if (conversation.type === 'group') {
       return conversation.metadata.name;
     }
-    const otherUser = conversation.participants.find(p => p.id !== currentUser?.id);
+    const otherUser = conversation.participants.find(p => p.userId !== currentUser?.id);
     return otherUser?.username || conversation.participants[0]?.username || 'Unknown';
   };
 

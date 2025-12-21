@@ -26,11 +26,12 @@ export const chatService = {
             : undefined;
 
           // Map backend message format to frontend Message
+          // Backend /conversations returns messages with 'content'
           let mappedLastMessage: Message | undefined = undefined;
           if (lastMessage) {
             mappedLastMessage = {
               id: lastMessage.id,
-              message: lastMessage.message || lastMessage.content || '',
+              content: lastMessage.content || lastMessage.message || '',
               sender: lastMessage.sender || { id: 'unknown', username: 'Unknown' },
               conversationId: lastMessage.conversationId,
               createdAt: new Date().toISOString()
@@ -42,7 +43,7 @@ export const chatService = {
             type: item.conversation.type,
             metadata: item.conversation.metadata || {},
             participants: (item.participants || []).map((p: any) => ({
-              id: p.userId,
+              userId: p.userId,
               username: p.username || "User " + (p.userId ? p.userId.substr(0, 4) : "Unknown")
             })),
             lastMessage: mappedLastMessage
@@ -72,7 +73,7 @@ export const chatService = {
 
     return data.map((item: any) => ({
       id: item.id,
-      message: item.message || item.content,
+      content: item.message || item.content, // Backend /messages returns 'message'
       sender: item.sender,
       conversationId: item.conversationId,
       createdAt: new Date().toISOString() // Backend doesn't return time
@@ -83,28 +84,26 @@ export const chatService = {
     type: string;
     metadata: { name: string };
     creator: { id: string; username: string };
-    participants: { id: string; username: string }[];
+    participants: { userId: string; username: string }[];
   }): Promise<Conversation> {
     const data = await apiClient.post("/conversation", {
       conversation: {
         type: conversationData.type,
         metadata: conversationData.metadata,
       },
-      participants: conversationData.participants,
+      participants: conversationData.participants.map(p => ({
+        id: p.userId, // Backend expects 'id' in participants array for creation, likely
+        username: p.username
+      })),
     });
 
-    // Check if backend returns the full mapped structure or just the DB record
-    // Assuming we need to return a Conversation object, we might need to cast or map `data`
-    // For now assuming data matches `GetConversationRepositoryOutput` or similar
-    // We will stick to returning 'any' cast to Conversation or simplistic mapping if needed.
-    // Based on `createConversationController`, it returns `CreateConversationRepositoryOutput` keys: `conversation`, `participants`.
-
+    // Backend returns { conversation: {...}, participants: [...] }
     return {
       id: data.conversation.id,
       type: data.conversation.type,
       metadata: data.conversation.metadata,
       participants: data.participants.map((p: any) => ({
-        id: p.userId,
+        userId: p.userId,
         username: p.username
       })),
     };
@@ -113,22 +112,18 @@ export const chatService = {
   async sendMessage(messageData: {
     conversationId: string;
     sender: { id: string; username: string };
-    message: string;
+    content: string;
   }): Promise<Message> {
-    const data = await apiClient.post("/conversation/message", {
+    await apiClient.post("/conversation/message", {
       conversationId: messageData.conversationId,
       sender: messageData.sender,
-      message: messageData.message
+      message: messageData.content // Backend expects 'message' in body
     });
 
-    // Backend returns { code, message: string } (success message), NOT the created message object in the response body of `handleSendMessage`.
-    // Wait, `sendMessageController` returns `ResponseDomain`.
-    // The previous implementation expected the created message back.
-    // If backend doesn't return the message, we have to simulate it for the UI to update optimistically or re-fetch.
-
+    // Backend doesn't return the message object on success
     return {
       id: "temp-" + Date.now(),
-      message: messageData.message,
+      content: messageData.content,
       sender: messageData.sender,
       conversationId: messageData.conversationId,
       createdAt: new Date().toISOString()
@@ -155,17 +150,20 @@ export const chatService = {
     targetUsername: string,
     action: 'accept' | 'deny'
   ): Promise<void> {
-    // When accepting/denying, 'we' are the sender of this action, and the original sender is the 'recipient' of this action via query params
     await apiClient.post(`/notification/friend/${action}?id=${targetUserId}&username=${targetUsername}`, {});
   },
-
-
 
   async addParticipants(data: {
     conversationId: string;
     creator: { id: string; username: string };
-    participants: { id: string; username: string }[];
+    participants: { userId: string; username: string }[];
   }): Promise<void> {
-    await apiClient.post("/conversation/participants", data);
+    await apiClient.post("/conversation/participants", {
+      ...data,
+      participants: data.participants.map(p => ({
+        id: p.userId,
+        username: p.username
+      }))
+    });
   },
 };
