@@ -114,8 +114,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         content: data.content,
       });
       // Don't need to do anything else if successful, as we already updated UI.
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send message:', error);
+      if (error.message) console.error('Error message:', error.message);
+      if (error.response) console.error('Error response:', await error.response.clone().json());
       // Revert optimistic update on failure
       setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
       throw error;
