@@ -1,21 +1,32 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Plus, LogOut, Bell } from 'lucide-react';
+import { Search, MessageSquarePlus, UserRoundPlus, LogOut, Bell } from 'lucide-react';
 import { NotificationDropdown } from '../common/NotificationDropdown';
+import { UserProfileModal } from '../modals/UserProfileModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
 import { Avatar } from '../../components/common/Avatar';
 import type { Conversation } from '../../types/chat.types';
 
 interface ConversationListProps {
-  onNewChat: () => void;
+  onNewGroupChat: () => void;
+  onAddFriend: () => void;
 }
 
-export function ConversationList({ onNewChat }: ConversationListProps) {
+export function ConversationList({ onNewGroupChat, onAddFriend }: ConversationListProps) {
   const { logout, currentUser } = useAuth();
-  const { conversations, selectedConversation, selectConversation, notifications } = useChat();
+  const {
+    conversations,
+    selectedConversation,
+    selectConversation,
+    notifications,
+    users,
+    markAllNotificationsAsRead
+  } = useChat();
   console.log('ConversationList render:', { conversationsLength: conversations?.length, notificationsLength: notifications?.length });
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const notificationWrapperRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -37,12 +48,43 @@ export function ConversationList({ onNewChat }: ConversationListProps) {
     };
   }, []);
 
+  // Track when notifications change to show badge
+  useEffect(() => {
+    if (notifications.length > 0) {
+      // Check if there are any unread notifications using the server-side isRead flag
+      const hasNewNotifications = notifications.some(n => !n.isRead);
+      setHasUnreadNotifications(hasNewNotifications);
+    } else {
+      setHasUnreadNotifications(false);
+    }
+  }, [notifications]);
+
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications && hasUnreadNotifications) {
+      // When opening notifications, mark all current ones as read on the server
+      markAllNotificationsAsRead();
+      setHasUnreadNotifications(false);
+    }
+  };
+
   const getConversationName = (conv: Conversation) => {
     if (conv.type === 'group') {
-      return conv.metadata.name;
+      return conv.name;
     }
-    const otherUser = conv.participants.find(p => p.userId !== currentUser?.id);
-    return otherUser?.username || conv.participants[0]?.username || 'Unknown';
+    const otherParticipant = conv.participants.find(p => p.userId !== currentUser?.id);
+    const participantToName = otherParticipant || conv.participants[0];
+
+    if (!participantToName) return 'Unknown';
+
+    // If username is valid, use it
+    if (participantToName.username && participantToName.username !== 'Unknown') {
+      return participantToName.username;
+    }
+
+    // Fallback: try to find user in global users list
+    const foundUser = users.find(u => u.id === participantToName.userId);
+    return foundUser?.username || 'Unknown';
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -53,31 +95,44 @@ export function ConversationList({ onNewChat }: ConversationListProps) {
     <div className="conversation-list">
       <div className="conversation-header" style={{ position: 'relative' }}>
         <div className="conversation-header-top">
-          <h2 className="conversation-title">Ocean Chat</h2>
-          <div className="conversation-actions">
-            <div className="notification-wrapper" ref={notificationWrapperRef} style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className={`icon-button relative`}
-                style={{
-                  position: 'relative',
-                  backgroundColor: showNotifications ? 'var(--ocean-100)' : 'transparent',
-                  color: showNotifications ? 'var(--ocean-700)' : 'inherit'
-                }}
-              >
-                <Bell />
-                {notifications.length > 0 && (
-                  <span className="notification-badge-count">{notifications.length}</span>
-                )}
-              </button>
+          <div className="header-user-section" onClick={() => setShowProfile(true)} title="View Profile">
+            <Avatar name={currentUser?.username || 'User'} size="sm" />
+            <h2 className="conversation-title">Ocean Chat</h2>
+          </div>
 
+          <div className="conversation-actions">
+            <div className="action-group social-actions">
+              <button onClick={onAddFriend} className="icon-button" title="Add Friend">
+                <UserRoundPlus />
+              </button>
+              <button onClick={onNewGroupChat} className="icon-button" title="Create Group Chat">
+                <MessageSquarePlus />
+              </button>
             </div>
-            <button onClick={onNewChat} className="icon-button">
-              <Plus />
-            </button>
-            <button onClick={logout} className="icon-button">
-              <LogOut />
-            </button>
+
+            <div className="action-divider" />
+
+            <div className="action-group system-actions">
+              <div className="notification-wrapper" ref={notificationWrapperRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={handleBellClick}
+                  className={`icon-button relative`}
+                  style={{
+                    backgroundColor: showNotifications ? 'var(--ocean-100)' : 'transparent',
+                    color: showNotifications ? 'var(--ocean-700)' : 'inherit'
+                  }}
+                  title="Notifications"
+                >
+                  <Bell />
+                  {hasUnreadNotifications && notifications.length > 0 && (
+                    <span className="notification-badge-count">{notifications.length}</span>
+                  )}
+                </button>
+              </div>
+              <button onClick={logout} className="icon-button" title="Log Out">
+                <LogOut />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -106,7 +161,6 @@ export function ConversationList({ onNewChat }: ConversationListProps) {
           >
             <NotificationDropdown
               notifications={notifications}
-              onClose={() => setShowNotifications(false)}
             />
           </div>
         )}
@@ -116,7 +170,7 @@ export function ConversationList({ onNewChat }: ConversationListProps) {
         {filteredConversations.length === 0 ? (
           <div className="conversation-empty">
             <p>No conversations yet</p>
-            <button onClick={onNewChat}>
+            <button onClick={onNewGroupChat}>
               Start a new chat
             </button>
           </div>
@@ -142,6 +196,10 @@ export function ConversationList({ onNewChat }: ConversationListProps) {
           ))
         )}
       </div>
+
+      {showProfile && (
+        <UserProfileModal onClose={() => setShowProfile(false)} />
+      )}
     </div >
   );
 }

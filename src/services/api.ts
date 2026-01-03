@@ -12,7 +12,7 @@ class ApiClient {
     };
 
     if (includeAuth) {
-      const token = localStorage.getItem("authToken");
+      const token = localStorage.getItem("accessToken");
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
@@ -25,7 +25,7 @@ class ApiClient {
     const headers: HeadersInit = {};
 
     if (includeAuth) {
-      const token = localStorage.getItem("authToken");
+      const token = localStorage.getItem("accessToken");
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
@@ -42,7 +42,12 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      if (response.status === 401 || response.status === 403 || response.status === 500) {
+        // Backend returns 500 for expired tokens sometimes, catch-all safety
+        window.dispatchEvent(new Event('auth:logout'));
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
     }
 
     return response.json();
@@ -57,7 +62,11 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      if (response.status === 401 || response.status === 403 || response.status === 500) {
+        window.dispatchEvent(new Event('auth:logout'));
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
     }
 
     return response.json();
@@ -77,7 +86,45 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async put<T>(endpoint: string, data?: T, includeAuth: boolean = true) {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: "PUT",
+      headers: this.getHeaders(includeAuth),
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403 || response.status === 500) {
+        window.dispatchEvent(new Event('auth:logout'));
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async delete(endpoint: string, includeAuth: boolean = true) {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: "DELETE",
+      headers: this.getHeaders(includeAuth),
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403 || response.status === 500) {
+        window.dispatchEvent(new Event('auth:logout'));
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
     }
 
     return response.json();

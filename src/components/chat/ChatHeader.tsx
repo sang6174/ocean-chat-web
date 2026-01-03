@@ -9,7 +9,7 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ onAddParticipants }: ChatHeaderProps) {
-  const { conversations, selectedConversation } = useChat();
+  const { conversations, selectedConversation, users } = useChat();
   const { currentUser } = useAuth();
 
   const conversation = conversations.find(c => c.id === selectedConversation);
@@ -18,10 +18,20 @@ export function ChatHeader({ onAddParticipants }: ChatHeaderProps) {
 
   const getConversationName = () => {
     if (conversation.type === 'group') {
-      return conversation.metadata.name;
+      return conversation.name;
     }
-    const otherUser = conversation.participants.find(p => p.userId !== currentUser?.id);
-    return otherUser?.username || conversation.participants[0]?.username || 'Unknown';
+    const otherParticipant = conversation.participants.find(p => p.userId !== currentUser?.id);
+    const participantToName = otherParticipant || conversation.participants[0];
+
+    if (!participantToName) return 'Unknown';
+
+    if (participantToName.username && participantToName.username !== 'Unknown') {
+      return participantToName.username;
+    }
+
+    // Fallback using global user list
+    const foundUser = users.find(u => u.id === participantToName.userId);
+    return foundUser?.username || 'Unknown';
   };
 
   return (
@@ -37,10 +47,19 @@ export function ChatHeader({ onAddParticipants }: ChatHeaderProps) {
       </div>
 
       {conversation.type === 'group' && (
-        <Button variant="secondary" onClick={onAddParticipants}>
-          <UserPlus style={{ width: '1rem', height: '1rem' }} />
-          Add Members
-        </Button>
+        (() => {
+          const myParticipant = conversation.participants.find(p => p.userId === currentUser?.id);
+          const isAdmin = myParticipant?.role === 'admin';
+
+          if (!isAdmin) return null;
+
+          return (
+            <Button variant="secondary" onClick={onAddParticipants}>
+              <UserPlus style={{ width: '1rem', height: '1rem' }} />
+              Add Members
+            </Button>
+          );
+        })()
       )}
     </div>
   );

@@ -22,19 +22,32 @@ export function MessageList() {
           <p>No messages yet. Start the conversation!</p>
         </div>
       ) : (
-        messages.map(msg => (
-          <div
-            key={msg.id}
-            className={`message-wrapper ${msg.sender.id === currentUser?.id ? 'sent' : 'received'}`}
-          >
-            <div className={`message-bubble ${msg.sender.id === currentUser?.id ? 'sent' : 'received'}`}>
-              {msg.sender.id !== currentUser?.id && (
-                <p className="message-sender">{msg.sender.username}</p>
-              )}
-              <p className="message-text">{msg.content}</p>
+        messages.map(msg => {
+          // System messages have no sender ID (null or empty string)
+          const isSystemMessage = !msg.sender?.id || msg.sender.id === '';
+
+          if (isSystemMessage) {
+            return (
+              <div key={msg.id} className="system-message">
+                <span className="system-message-content">{msg.content}</span>
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={msg.id}
+              className={`message-wrapper ${msg.sender.id === currentUser?.id ? 'sent' : 'received'}`}
+            >
+              <div className={`message-bubble ${msg.sender.id === currentUser?.id ? 'sent' : 'received'}`}>
+                {msg.sender.id !== currentUser?.id && (
+                  <p className="message-sender">{msg.sender.username}</p>
+                )}
+                <p className="message-text">{msg.content}</p>
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
       <div ref={messagesEndRef} />
     </div>

@@ -15,7 +15,9 @@ export interface RegisterData {
 export interface AuthResponse {
   userId: string;
   username: string;
-  authToken: string;
+  email: string; // Add email
+  accessToken: string;
+  refreshToken?: string;
 }
 
 export interface AuthContextType {
@@ -24,4 +26,5 @@ export interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  setCurrentUser: (user: User | null) => void;
 }

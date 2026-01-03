@@ -6,13 +6,15 @@ import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { ConversationList } from './components/chat/ConversationList';
 import { ChatArea } from './components/chat/ChatArea';
-import { NewChatModal } from './components/modals/NewChatModal';
+import { CreateGroupChatModal } from './components/modals/CreateGroupChatModal';
+import { AddFriendModal } from './components/modals/AddFriendModal';
 import { AddParticipantsModal } from './components/modals/AddParticipantsModal';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [showNewChat, setShowNewChat] = useState(false);
+  const [showCreateGroupChat, setShowCreateGroupChat] = useState(false);
+  const [showAddFriend, setShowAddFriend] = useState(false);
   const [showAddParticipants, setShowAddParticipants] = useState(false);
 
   if (!isAuthenticated) {
@@ -26,10 +28,14 @@ function AppContent() {
   return (
     <ChatProvider>
       <div className="chat-container">
-        <ConversationList onNewChat={() => setShowNewChat(true)} />
+        <ConversationList
+          onNewGroupChat={() => setShowCreateGroupChat(true)}
+          onAddFriend={() => setShowAddFriend(true)}
+        />
         <ChatArea onAddParticipants={() => setShowAddParticipants(true)} />
 
-        {showNewChat && <NewChatModal onClose={() => setShowNewChat(false)} />}
+        {showCreateGroupChat && <CreateGroupChatModal onClose={() => setShowCreateGroupChat(false)} />}
+        {showAddFriend && <AddFriendModal onClose={() => setShowAddFriend(false)} />}
         {showAddParticipants && <AddParticipantsModal onClose={() => setShowAddParticipants(false)} />}
       </div>
     </ChatProvider>

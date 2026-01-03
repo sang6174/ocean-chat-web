@@ -8,7 +8,7 @@ export class WebSocketService {
 
   connect(userId: string) {
     this.userId = userId;
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem("accessToken");
     if (!token) {
       console.error("No auth token found");
       return;

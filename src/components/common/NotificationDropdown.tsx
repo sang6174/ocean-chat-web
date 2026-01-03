@@ -1,23 +1,14 @@
-import React from 'react';
 import { UserPlus, Check, X } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
+import type { NotificationItem } from '../../types/chat.types';
 
-export interface NotificationItem {
-    id: string; // Unique ID for the notification in UI state
-    type: 'friend_request';
-    sender: {
-        id: string;
-        username: string;
-    };
-    timestamp: Date;
-}
+// export interface NotificationItem was here, now imported
 
 interface NotificationDropdownProps {
     notifications: NotificationItem[];
-    onClose: () => void;
 }
 
-export function NotificationDropdown({ notifications, onClose }: NotificationDropdownProps) {
+export function NotificationDropdown({ notifications }: NotificationDropdownProps) {
     const { acceptFriendRequest, denyFriendRequest } = useChat();
 
     const handleAccept = async (notification: NotificationItem) => {
@@ -49,28 +40,31 @@ export function NotificationDropdown({ notifications, onClose }: NotificationDro
                     </div>
                 ) : (
                     notifications.map((notif) => (
-                        <div key={notif.id} className="notification-item">
+                        <div key={notif.id} className={`notification-item ${!notif.isRead ? 'unread' : ''}`}>
                             <div className="notification-icon">
                                 <UserPlus size={20} />
                             </div>
                             <div className="notification-content">
-                                <p>
-                                    <span className="font-bold">{notif.sender.username}</span> sent you a friend request.
-                                </p>
-                                <div className="notification-actions">
-                                    <button
-                                        className="action-btn accept"
-                                        onClick={() => handleAccept(notif)}
-                                    >
-                                        <Check size={16} /> Accept
-                                    </button>
-                                    <button
-                                        className="action-btn deny"
-                                        onClick={() => handleDeny(notif)}
-                                    >
-                                        <X size={16} /> Deny
-                                    </button>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <p>{notif.content}</p>
+                                    {!notif.isRead && <div className="unread-indicator" title="Unread" />}
                                 </div>
+                                {notif.type === 'friend_request' && notif.status === 'pending' && (
+                                    <div className="notification-actions">
+                                        <button
+                                            className="action-btn accept"
+                                            onClick={() => handleAccept(notif)}
+                                        >
+                                            <Check size={16} /> Accept
+                                        </button>
+                                        <button
+                                            className="action-btn deny"
+                                            onClick={() => handleDeny(notif)}
+                                        >
+                                            <X size={16} /> Deny
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))

@@ -3,18 +3,37 @@ import { chatService } from '../services/chatService';
 import { websocketService } from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
 import type { User } from "../types/user.types";
-import type { Conversation, Message, ChatContextType, CreateConversationData, SendMessageData } from '../types/chat.types';
-import type { NotificationItem } from '../components/common/NotificationDropdown';
+import type { Conversation, Message, ChatContextType, CreateConversationData, SendMessageData, NotificationItem } from '../types/chat.types';
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, currentUser } = useAuth();
+  const { isAuthenticated, currentUser, setCurrentUser } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]); // Recipient only
+  const [allNotifications, setAllNotifications] = useState<NotificationItem[]>([]); // All notifications
+
+  // One-time enrichment of currentUser profile (to get real name etc.)
+  // We do this here instead of Login API per user preference for dedicated profile API
+  useEffect(() => {
+    if (isAuthenticated && currentUser && currentUser.id) {
+      chatService.getUser(currentUser.id)
+        .then(data => {
+          if (data && data.name) {
+            console.log('ChatContext: Enriched current user profile from Profile API');
+            setCurrentUser({
+              ...currentUser,
+              name: data.name,
+              email: data.email || currentUser.email
+            });
+          }
+        })
+        .catch(err => console.error('ChatContext: Failed to enrich profile', err));
+    }
+  }, [isAuthenticated, currentUser?.id]); // Only runs when session starts or user changes
 
   const loadConversations = useCallback(async () => {
     console.log('loadConversations called. currentUser:', currentUser);
@@ -39,6 +58,28 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Load notifications where user is RECIPIENT (for Notification Panel)
+  const loadNotifications = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const data = await chatService.getNotifications(currentUser.id);
+      setNotifications(data);
+    } catch (error) {
+      console.error("Failed to load notifications", error);
+    }
+  }, [currentUser]);
+
+  // Load ALL notifications involving user (for AddFriendModal)
+  const loadAllNotifications = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const data = await chatService.getAllNotificationsForUser(currentUser.id);
+      setAllNotifications(data);
+    } catch (error) {
+      console.error("Failed to load all notifications", error);
+    }
+  }, [currentUser]);
+
   const selectConversation = useCallback(async (id: string) => {
     setSelectedConversation(id);
     try {
@@ -60,26 +101,50 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           userId: id,
           username: user?.username || "Unknown"
         };
-      });
+      })
 
-      // Add current user to participants
-      participants.push({
-        userId: currentUser.id,
-        username: currentUser.username
-      });
+      // Add current user to participants list (creator must be a member)
+      const allParticipants = [
+        { userId: currentUser.id, username: currentUser.username },
+        ...participants
+      ];
 
-      await chatService.createConversation({
+      const response = await chatService.createConversation({
         type: data.type,
-        metadata: {
-          name: data.groupName || '',
-        },
-        creator: {
-          id: currentUser.id,
-          username: currentUser.username,
-        },
-        participants: participants,
+        name: data.name,
+        participants: allParticipants.map(p => ({ userId: p.userId })),
       });
-      await loadConversations();
+
+      // Map backend response to frontend Conversation type
+      const newConversation: Conversation = {
+        id: response.conversation.id,
+        type: response.conversation.type,
+        name: response.conversation.name,
+        creatorId: response.conversation.creator.id,
+        creator: response.conversation.creator,
+        participants: response.participants.map((p: any) => ({
+          userId: p.user.id,
+          username: p.user.username || "Unknown",
+          role: p.role
+        })),
+        lastMessage: response.messages && response.messages.length > 0 ? {
+          id: response.messages[0].id,
+          content: response.messages[0].content,
+          sender: {
+            id: response.messages[0].senderId || "",
+            username: "System" // Usually the first message in a group is system message
+          },
+          conversationId: response.conversation.id,
+          createdAt: new Date().toISOString()
+        } : undefined
+      };
+
+      setConversations(prev => {
+        if (prev.some(c => c.id === newConversation.id)) {
+          return prev;
+        }
+        return [newConversation, ...prev];
+      });
     } catch (error) {
       console.error('Failed to create conversation:', error);
       throw error;
@@ -101,8 +166,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString()
     };
 
-    // Update UI immediately
+    // Update UI immediately (messages and conversation list)
     setMessages(prev => [...prev, optimisticMessage]);
+    setConversations(prev => {
+      const convIndex = prev.findIndex(c => c.id === data.conversationId);
+      if (convIndex === -1) return prev;
+
+      const updatedConv = { ...prev[convIndex], lastMessage: optimisticMessage };
+      const otherConvs = prev.filter(c => c.id !== data.conversationId);
+      return [updatedConv, ...otherConvs];
+    });
 
     try {
       await chatService.sendMessage({
@@ -120,69 +193,118 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (error.response) console.error('Error response:', await error.response.clone().json());
       // Revert optimistic update on failure
       setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
+      // Reload conversations to sync state correctly on failure
+      loadConversations();
       throw error;
     }
-  }, [currentUser]);
+  }, [currentUser, loadConversations]);
 
   const sendFriendRequest = useCallback(async (userId: string, username: string) => {
     try {
       await chatService.sendFriendRequest(userId, username);
+      // Reload both notifications for immediate UI update
+      await loadNotifications();
+      await loadAllNotifications();
     } catch (error) {
       console.error("Failed to send friend request:", error);
       throw error;
     }
-  }, []);
+  }, [loadNotifications, loadAllNotifications]);
 
-  const acceptFriendRequest = useCallback(async (senderId: string, senderUsername: string) => {
+  const cancelFriendRequest = useCallback(async (notificationId: string, userId: string, username: string) => {
+    try {
+      await chatService.cancelFriendRequest(notificationId, userId, username);
+      // Reload both notifications for immediate UI update
+      await loadNotifications();
+      await loadAllNotifications();
+    } catch (error) {
+      console.error("Failed to cancel friend request:", error);
+      throw error;
+    }
+  }, [loadNotifications, loadAllNotifications]);
+
+  const acceptFriendRequest = useCallback(async (senderId: string) => {
     if (!currentUser) return;
     try {
-      // Logic: I am the one accepting, so I pass the senderId as the "target" to accept
-      // The original sender (senderId) is who sent the request.
-      await chatService.responseFriendRequest(senderId, senderUsername, 'accept');
-      // Remove from notifications
-      setNotifications(prev => prev.filter(n => n.sender.id !== senderId));
+      // Find notification ID
+      const notification = notifications.find(n => n.sender.id === senderId && n.type === 'friend_request');
+      if (!notification) {
+        console.error("No friend request notification found for sender:", senderId);
+        return;
+      }
+
+      await chatService.responseFriendRequest(notification.id, currentUser.id, currentUser.username, 'accept');
+      // Reload notifications and conversations
+      await loadNotifications();
+      await loadAllNotifications();
       loadConversations();
     } catch (error) {
       console.error("Failed to accept friend request:", error);
       throw error;
     }
-  }, [currentUser, loadConversations]);
+  }, [currentUser, notifications, loadConversations, loadNotifications, loadAllNotifications]);
 
-  const denyFriendRequest = useCallback(async (senderId: string, senderUsername: string) => {
+  const denyFriendRequest = useCallback(async (senderId: string) => {
     if (!currentUser) return;
     try {
-      await chatService.responseFriendRequest(senderId, senderUsername, 'deny');
-      setNotifications(prev => prev.filter(n => n.sender.id !== senderId));
+      const notification = notifications.find(n => n.sender.id === senderId && n.type === 'friend_request');
+      if (!notification) {
+        console.error("No friend request notification found for sender:", senderId);
+        return;
+      }
+
+      await chatService.responseFriendRequest(notification.id, currentUser.id, currentUser.username, 'deny');
+      // Reload both notifications for immediate UI update
+      await loadNotifications();
+      await loadAllNotifications();
     } catch (error) {
       console.error("Failed to deny friend request:", error);
       throw error;
     }
-  }, [currentUser]);
+  }, [currentUser, notifications, loadNotifications, loadAllNotifications]);
+
+  const markAllNotificationsAsRead = useCallback(async () => {
+    try {
+      await chatService.markNotificationsAsRead();
+      // Optimistically update local state
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      // Also update allNotifications if needed (though it might have sender items too)
+      setAllNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (error) {
+      console.error("Failed to mark notifications as read:", error);
+    }
+  }, []);
 
   const addParticipants = useCallback(async (conversationId: string, participantIds: string[]) => {
     if (!currentUser) return;
     try {
-      const participants = participantIds.map(id => {
-        const user = users.find(u => u.id === id);
-        return {
-          userId: id,
-          username: user?.username || "Unknown"
-        };
-      });
-
       await chatService.addParticipants({
         conversationId,
-        creator: { id: currentUser.id, username: currentUser.username },
-        participants
+        participants: participantIds.map(id => ({ userId: id }))
       });
-      // Gateway event will handle the update via handleNewConversation/handleParticipantAdded if needed
-      // Or we can reload manually
-      loadConversations();
+      // No loadConversations() here, WebSocket or manual optimization will handle it
     } catch (error) {
       console.error("Failed to add participants:", error);
       throw error;
     }
-  }, [currentUser, users, loadConversations]);
+  }, [currentUser, loadConversations]);
+
+  const unfriend = useCallback(async (userId: string) => {
+    if (!currentUser) return;
+    try {
+      await chatService.unfriend(userId, conversations);
+      // Remove the conversation from state
+      setConversations(prev => prev.filter(c =>
+        !(c.type === 'direct' && c.participants.some(p => p.userId === userId))
+      ));
+      // Reload both notifications for immediate UI update
+      await loadNotifications();
+      await loadAllNotifications();
+    } catch (error) {
+      console.error("Failed to unfriend:", error);
+      throw error;
+    }
+  }, [currentUser, conversations, loadNotifications, loadAllNotifications]);
 
   const usersRef = useRef(users);
   const selectedConversationRef = useRef(selectedConversation);
@@ -209,10 +331,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // We need to construct a Message object
 
       const senderId = payload.metadata?.senderId;
-      const conversationId = payload.metadata?.toConversationId;
+      const conversationId = payload.metadata?.conversationId;
       const content = payload.data;
 
-      if (!senderId || !conversationId || !content) {
+      // Allow empty senderId for system messages
+      if (senderId === undefined || !conversationId || !content) {
         console.warn("Received malformed message via WebSocket", payload);
         return;
       }
@@ -224,106 +347,196 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Only update messages if it belongs to the selected conversation
-      if (conversationId !== selectedConversationRef.current) {
-        console.log('WS: Message for another conversation, skipping message list update');
-        loadConversations(); // Still reload conversations to update sidebar
-        return;
-      }
-
-      // Try to find sender details using ref
+      // 1. ALWAYS update lastMessage in the conversations list and move it to the top
+      // This ensures sidebar updates even if we are in another chat
       const senderUser = usersRef.current.find((u: User) => u.id === senderId);
-      const senderUsername = senderUser?.username || "Unknown";
+      const senderUsername = senderId ? (senderUser?.username || "Unknown") : "System";
 
       const newMessage: Message = {
-        id: "ws-" + Date.now(), // Backend doesn't send ID in WS event
+        id: "ws-" + Date.now() + Math.random().toString(36).substr(2, 9), // More unique ID
         conversationId: conversationId,
         sender: {
-          id: senderId,
+          id: senderId || "", // Empty string means system message
           username: senderUsername,
         },
         content: content,
         createdAt: new Date().toISOString()
       };
 
+      setConversations(prev => {
+        const convIndex = prev.findIndex(c => c.id === conversationId);
+        if (convIndex === -1) return prev;
+
+        const updatedConv = { ...prev[convIndex], lastMessage: newMessage };
+        const otherConvs = prev.filter(c => c.id !== conversationId);
+        return [updatedConv, ...otherConvs];
+      });
+
+      // 2. Only update message history if it belongs to the selected conversation
+      if (conversationId !== selectedConversationRef.current) {
+        console.log('WS: Message for another conversation, updated sidebar only');
+        return;
+      }
+
+      // Add to message history
       setMessages(prev => {
+        // Check for duplicate messages (same sender, content, and within 2 seconds)
+        const isDuplicate = prev.some(msg =>
+          msg.sender.id === (senderId || "") &&
+          msg.content === content &&
+          Math.abs(new Date((msg.createdAt ?? new Date().toISOString())).getTime() - new Date((newMessage.createdAt ?? new Date().toISOString())).getTime()) < 2000
+        );
+
+        if (isDuplicate) {
+          console.log('WS: Duplicate message detected, skipping', content.substring(0, 20));
+          return prev;
+        }
+
         console.log('WS: Appending new message to state', newMessage.id);
         return [...prev, newMessage];
       });
-
-      loadConversations();
     };
 
     const handleNewConversation = (payload: any) => {
-      console.log('WS: New conversation created', payload);
-      loadConversations();
-    };
+      console.log('WS: New conversation/participant event', payload);
 
-    const handleFriendRequest = (payload: any) => {
-      console.log('WS: Friend request received', payload);
-      const senderId = payload.metadata?.senderId;
-      let message = payload.data;
-      let senderUsername = "Unknown";
+      // Backend sends the main data in the 'data' property
+      const convData = payload.data;
+      if (!convData) return;
 
-      // Extract username from message if possible "X send you..."
-      if (typeof message === 'string' && message.includes(' send you a friend request.')) {
-        senderUsername = message.replace(' send you a friend request.', '');
-      } else if (typeof message === 'string' && message.includes(' send you a add friend invitation.')) {
-        senderUsername = message.replace(' send you a add friend invitation.', '');
+      const type = payload.type;
+      const conversationId = payload.metadata?.conversationId;
+
+      // Handle participant addition event specifically
+      if (type === 'conversation.added.participants' && conversationId) {
+        console.log('WS: Handling participant addition for', conversationId);
+
+        const newParticipants = convData.participants.map((p: any) => ({
+          userId: p.user.id,
+          username: p.user.username || "Unknown",
+          role: p.role
+        }));
+
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversationId) {
+            // Filter out any duplicates and add new ones
+            const existingIds = new Set(conv.participants.map(p => p.userId));
+            const uniqueNew = newParticipants.filter((p: any) => !existingIds.has(p.userId));
+
+            if (uniqueNew.length === 0) return conv;
+
+            return {
+              ...conv,
+              participants: [...conv.participants, ...uniqueNew]
+            };
+          }
+          return conv;
+        }));
+
+        // Final fallback to ensure sync
+        setTimeout(() => loadConversations(), 2000);
+        return;
       }
 
-      const newNotification: NotificationItem = {
-        id: "notif-" + Date.now(),
-        type: 'friend_request',
-        sender: {
-          id: senderId,
-          username: senderUsername
-        },
-        timestamp: new Date()
-      };
+      // If this is a full conversation object (from 'conversation.created')
+      if (convData.conversation) {
+        // Map to frontend type
+        const newConv: Conversation = {
+          id: convData.conversation.id,
+          type: convData.conversation.type,
+          name: convData.conversation.name,
+          creatorId: convData.conversation.creator.id,
+          creator: convData.conversation.creator,
+          participants: convData.participants.map((p: any) => ({
+            userId: p.user.id,
+            username: p.user.username || "Unknown",
+            role: p.role
+          })),
+          lastMessage: convData.messages && convData.messages.length > 0 ? {
+            id: convData.messages[0].id,
+            content: convData.messages[0].content,
+            sender: {
+              id: convData.messages[0].senderId || "",
+              username: "System"
+            },
+            conversationId: convData.conversation.id,
+            createdAt: new Date().toISOString()
+          } : undefined
+        };
 
-      setNotifications(prev => {
-        // Prevent duplicate friend requests from same sender
-        const exists = prev.some(n =>
-          n.type === 'friend_request' &&
-          n.sender.id === senderId
-        );
+        setConversations(prev => {
+          // Check if it already exists
+          if (prev.find(c => c.id === newConv.id)) {
+            return prev.map(c => c.id === newConv.id ? newConv : c);
+          }
+          return [newConv, ...prev];
+        });
+      } else {
+        // If it's just a participant update or other partial event, reload all
+        loadConversations();
+      }
+    };
 
-        if (exists) return prev;
+    const handleFriendRequest = async (payload: any) => {
+      console.log('WS: Friend request received', payload);
+      const senderId = payload.metadata?.senderId;
 
-        return [newNotification, ...prev];
-      });
+      if (!senderId) return;
+
+      // Reload notifications from backend to get real ID and details
+      await loadNotifications();
+      await loadAllNotifications();
     };
 
     const handleFriendAccepted = (payload: any) => {
       console.log('WS: Friend request accepted', payload);
       loadConversations();
+      loadNotifications();
+      loadAllNotifications();
+    };
+
+    const handleFriendCancelled = async (payload: any) => {
+      console.log('WS: Friend request cancelled', payload);
+      await loadNotifications();
+      await loadAllNotifications();
+    };
+
+    const handleFriendDenied = async (payload: any) => {
+      console.log('WS: Friend request denied', payload);
+      await loadNotifications();
+      await loadAllNotifications();
     };
 
     websocketService.on('message.created', handleNewMessage);
     websocketService.on('conversation.created', handleNewConversation);
     websocketService.on('conversation.added.participants', handleNewConversation);
-    websocketService.on('notification.add.friend', handleFriendRequest);
-    websocketService.on('notification.accepted.friend', handleFriendAccepted);
+    websocketService.on('notification.friend.request', handleFriendRequest);
+    websocketService.on('notification.accepted.friend.request', handleFriendAccepted);
+    websocketService.on('notification.cancelled.friend.request', handleFriendCancelled);
+    websocketService.on('notification.denied.friend.request', handleFriendDenied);
 
     return () => {
       websocketService.off('message.created', handleNewMessage);
       websocketService.off('conversation.created', handleNewConversation);
       websocketService.off('conversation.added.participants', handleNewConversation);
-      websocketService.off('notification.add.friend', handleFriendRequest);
-      websocketService.off('notification.accepted.friend', handleFriendAccepted);
+      websocketService.off('notification.friend.request', handleFriendRequest);
+      websocketService.off('notification.accepted.friend.request', handleFriendAccepted);
+      websocketService.off('notification.cancelled.friend.request', handleFriendCancelled);
+      websocketService.off('notification.denied.friend.request', handleFriendDenied);
     };
-  }, [isAuthenticated, loadConversations]);
+  }, [isAuthenticated, loadConversations, loadNotifications]);
 
   useEffect(() => {
     console.log('ChatContext effect triggered. Auth:', isAuthenticated, 'User:', currentUser);
     if (isAuthenticated && currentUser) {
       loadConversations();
       loadUsers();
+      loadNotifications();
+      loadAllNotifications(); // Load all notifications for AddFriendModal
     } else {
       console.log('ChatContext skip: Auth or User missing');
     }
-  }, [isAuthenticated, currentUser, loadConversations, loadUsers]);
+  }, [isAuthenticated, currentUser, loadConversations, loadUsers, loadNotifications, loadAllNotifications]);
 
   return (
     <ChatContext.Provider
@@ -339,11 +552,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         loadUsers,
 
         sendFriendRequest,
+        cancelFriendRequest,
         acceptFriendRequest,
         denyFriendRequest,
+        unfriend,
 
         notifications,
+        allNotifications,
         addParticipants,
+        markAllNotificationsAsRead,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useState, useEffect, type ReactNode } from 'react';
 import { authService } from '../services/authService';
 import { websocketService } from '../services/websocketService';
 import type { User } from '../types/user.types';
@@ -13,18 +13,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const userId = localStorage.getItem('userId');
     const username = localStorage.getItem('username');
-    const authToken = localStorage.getItem('authToken');
+    const email = localStorage.getItem('email');
+    const authToken = localStorage.getItem('accessToken');
 
     if (userId && username && authToken) {
       setCurrentUser({
         id: userId,
         username,
         name: username,
-        email: '',
+        email: email || '',
       });
       setIsAuthenticated(true);
       websocketService.connect(userId);
     }
+
+    const handleLogoutEvent = () => {
+      logout();
+    };
+
+    window.addEventListener('auth:logout', handleLogoutEvent);
+
+    return () => {
+      window.removeEventListener('auth:logout', handleLogoutEvent);
+    };
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
@@ -32,13 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem('userId', data.userId);
     localStorage.setItem('username', data.username);
-    localStorage.setItem('authToken', data.authToken);
+    localStorage.setItem('email', data.email);
+    localStorage.setItem('accessToken', data.accessToken);
 
     setCurrentUser({
       id: data.userId,
       username: data.username,
       name: data.username,
-      email: '',
+      email: data.email,
     });
     setIsAuthenticated(true);
     websocketService.connect(data.userId);
@@ -57,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, currentUser, login, register, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, currentUser, login, register, logout, setCurrentUser }}>
       {children}
     </AuthContext.Provider>
   );

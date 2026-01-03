@@ -61,8 +61,12 @@
     transition: background 0.2s;
 }
 
-.notification-item:hover {
+.notification-item.unread {
     background: var(--ocean-50);
+}
+
+.notification-item:hover {
+    background: var(--ocean-100);
 }
 
 .notification-item:last-child {
@@ -92,6 +96,13 @@
     margin-bottom: var(--space-3);
 }
 
+.unread-indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--ocean-500);
+    border-radius: 50%;
+}
+
 .notification-actions {
     display: flex;
     gap: var(--space-2);
@@ -113,24 +124,27 @@
 }
 
 .action-btn.accept {
-    background: var(--purple-600);
+    background: #10b981;
     color: white;
+    font-weight: 700;
 }
 
 .action-btn.accept:hover {
-    background: var(--purple-700);
-    box-shadow: 0 2px 4px rgba(168, 85, 247, 0.2);
+    background: #059669;
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+    transform: translateY(-1px);
 }
 
 .action-btn.deny {
-    background: white;
-    color: var(--gray-700);
-    border-color: var(--gray-200);
+    background: #ef4444;
+    color: white;
+    font-weight: 700;
 }
 
 .action-btn.deny:hover {
-    background: var(--gray-50);
-    border-color: var(--gray-300);
+    background: #dc2626;
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+    transform: translateY(-1px);
 }
 
 /* Badge for existing bell */
