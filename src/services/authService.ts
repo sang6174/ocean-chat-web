@@ -24,7 +24,7 @@ export const authService = {
   },
 
   async refreshToken(): Promise<AuthResponse> {
-    const data = await apiClient.get("/v1/auth/access-token");
+    const data = await apiClient.post("/v1/auth/refresh", {}, false);
     return data;
   },
 };

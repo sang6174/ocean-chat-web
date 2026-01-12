@@ -135,13 +135,13 @@
     transform: translateY(-1px);
 }
 
-.action-btn.deny {
+.action-btn.reject {
     background: #ef4444;
     color: white;
     font-weight: 700;
 }
 
-.action-btn.deny:hover {
+.action-btn.reject:hover {
     background: #dc2626;
     box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
     transform: translateY(-1px);

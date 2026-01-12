@@ -244,7 +244,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [currentUser, notifications, loadConversations, loadNotifications, loadAllNotifications]);
 
-  const denyFriendRequest = useCallback(async (senderId: string) => {
+  const rejectFriendRequest = useCallback(async (senderId: string) => {
     if (!currentUser) return;
     try {
       const notification = notifications.find(n => n.sender.id === senderId && n.type === 'friend_request');
@@ -253,12 +253,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      await chatService.responseFriendRequest(notification.id, currentUser.id, currentUser.username, 'deny');
+      await chatService.responseFriendRequest(notification.id, currentUser.id, currentUser.username, 'reject');
       // Reload both notifications for immediate UI update
       await loadNotifications();
       await loadAllNotifications();
     } catch (error) {
-      console.error("Failed to deny friend request:", error);
+      console.error("Failed to reject friend request:", error);
       throw error;
     }
   }, [currentUser, notifications, loadNotifications, loadAllNotifications]);
@@ -425,18 +425,55 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             if (uniqueNew.length === 0) return conv;
 
-            return {
+            // Update lastMessage if provided in the payload
+            let updatedConv = {
               ...conv,
               participants: [...conv.participants, ...uniqueNew]
             };
+
+            if (convData.messages && convData.messages.length > 0) {
+              const lastMsg = convData.messages[convData.messages.length - 1];
+              updatedConv.lastMessage = {
+                id: lastMsg.id,
+                content: lastMsg.content,
+                sender: {
+                  id: lastMsg.senderId || "",
+                  username: "System"
+                },
+                conversationId: conversationId,
+                createdAt: lastMsg.created_at || new Date().toISOString()
+              };
+            }
+            return updatedConv;
           }
           return conv;
         }));
 
-        // Final fallback to ensure sync
-        setTimeout(() => loadConversations(), 2000);
-        return;
+        // Append system messages to current chat if selected
+        if (conversationId === selectedConversationRef.current && convData.messages) {
+          const systemMessages: Message[] = convData.messages.map((m: any) => ({
+            id: m.id,
+            content: m.content,
+            sender: {
+              id: m.senderId || "",
+              username: "System"
+            },
+            conversationId: conversationId,
+            createdAt: m.created_at || new Date().toISOString()
+          }));
+
+          setMessages(prev => {
+            // Avoid duplicates
+            const existingIds = new Set(prev.map(msg => msg.id));
+            const uniqueMsgs = systemMessages.filter(m => !existingIds.has(m.id));
+            return [...prev, ...uniqueMsgs];
+          });
+        }
       }
+
+      // Final fallback to ensure sync
+      setTimeout(() => loadConversations(), 2000);
+      return;
 
       // If this is a full conversation object (from 'conversation.created')
       if (convData.conversation) {
@@ -501,8 +538,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       await loadAllNotifications();
     };
 
-    const handleFriendDenied = async (payload: any) => {
-      console.log('WS: Friend request denied', payload);
+    const handleFriendRejected = async (payload: any) => {
+      console.log('WS: Friend request rejected', payload);
       await loadNotifications();
       await loadAllNotifications();
     };
@@ -513,7 +550,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     websocketService.on('notification.friend.request', handleFriendRequest);
     websocketService.on('notification.accepted.friend.request', handleFriendAccepted);
     websocketService.on('notification.cancelled.friend.request', handleFriendCancelled);
-    websocketService.on('notification.denied.friend.request', handleFriendDenied);
+    websocketService.on('notification.rejected.friend.request', handleFriendRejected);
 
     return () => {
       websocketService.off('message.created', handleNewMessage);
@@ -522,7 +559,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       websocketService.off('notification.friend.request', handleFriendRequest);
       websocketService.off('notification.accepted.friend.request', handleFriendAccepted);
       websocketService.off('notification.cancelled.friend.request', handleFriendCancelled);
-      websocketService.off('notification.denied.friend.request', handleFriendDenied);
+      websocketService.off('notification.rejected.friend.request', handleFriendRejected);
     };
   }, [isAuthenticated, loadConversations, loadNotifications]);
 
@@ -554,7 +591,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         sendFriendRequest,
         cancelFriendRequest,
         acceptFriendRequest,
-        denyFriendRequest,
+        rejectFriendRequest,
         unfriend,
 
         notifications,

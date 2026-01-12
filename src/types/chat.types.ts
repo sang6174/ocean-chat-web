@@ -3,7 +3,7 @@ import type { User } from "./user.types";
 
 export interface NotificationItem {
   id: string; // Unique ID for the notification in UI state
-  type: 'friend_request' | 'accept_friend_request' | 'deny_friend_request';
+  type: 'friend_request' | 'accept_friend_request' | 'reject_friend_request';
   sender: {
     id: string;
     username: string;
@@ -73,7 +73,7 @@ export interface ChatContextType {
   sendFriendRequest: (userId: string, username: string) => Promise<void>;
   cancelFriendRequest: (notificationId: string, userId: string, username: string) => Promise<void>;
   acceptFriendRequest: (senderId: string, senderUsername: string) => Promise<void>;
-  denyFriendRequest: (senderId: string, senderUsername: string) => Promise<void>;
+  rejectFriendRequest: (senderId: string, senderUsername: string) => Promise<void>;
   unfriend: (userId: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   notifications: NotificationItem[];

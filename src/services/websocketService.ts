@@ -46,6 +46,7 @@ export class WebSocketService {
 
   disconnect() {
     if (this.ws) {
+      this.ws.onclose = null; // Prevent reconnect trigger
       this.ws.close();
       this.ws = null;
     }
@@ -53,13 +54,15 @@ export class WebSocketService {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
+    this.userId = null;
   }
 
   private reconnect() {
     if (this.userId && !this.reconnectTimeout) {
       this.reconnectTimeout = window.setTimeout(() => {
+        if (!this.userId) return; // double check
         console.log("Attempting to reconnect...");
-        this.connect(this.userId!);
+        this.connect(this.userId);
       }, 3000);
     }
   }

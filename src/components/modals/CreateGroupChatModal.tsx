@@ -10,7 +10,7 @@ interface CreateGroupChatModalProps {
 }
 
 export function CreateGroupChatModal({ onClose }: CreateGroupChatModalProps) {
-    const { users, createConversation } = useChat();
+    const { users, createConversation, conversations } = useChat();
     const { currentUser } = useAuth();
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
     const [groupName, setGroupName] = useState('');
@@ -47,7 +47,16 @@ export function CreateGroupChatModal({ onClose }: CreateGroupChatModalProps) {
         );
     };
 
-    const availableUsers = users.filter(u => u.id !== currentUser?.id);
+    // Derive friends list from direct conversations
+    const friendIds = new Set(
+        conversations
+            .filter(c => c.type === 'direct')
+            .flatMap(c => c.participants)
+            .map(p => p.userId)
+            .filter(id => id !== currentUser?.id)
+    );
+
+    const availableUsers = users.filter(u => friendIds.has(u.id));
 
     return (
         <div className="modal-overlay">

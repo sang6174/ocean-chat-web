@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, type ReactNode } from 'react';
 import { authService } from '../services/authService';
+import { profileService } from '../services/profileService';
 import { websocketService } from '../services/websocketService';
 import type { User } from '../types/user.types';
 import type { AuthContextType, LoginCredentials, RegisterData } from '../types/auth.types';
@@ -41,16 +42,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (credentials: LoginCredentials) => {
     const data = await authService.login(credentials);
 
+    // Save access token temporarily to fetch profile
+    localStorage.setItem('accessToken', data.accessToken);
+
+    // Fetch full profile to get email
+    const userProfile = await profileService.getProfile();
+
     localStorage.setItem('userId', data.userId);
     localStorage.setItem('username', data.username);
-    localStorage.setItem('email', data.email);
-    localStorage.setItem('accessToken', data.accessToken);
+    localStorage.setItem('email', userProfile.email); // Use email from profile
 
     setCurrentUser({
       id: data.userId,
       username: data.username,
-      name: data.username,
-      email: data.email,
+      name: userProfile.name, // Use name from profile
+      email: userProfile.email,
     });
     setIsAuthenticated(true);
     websocketService.connect(data.userId);

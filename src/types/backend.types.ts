@@ -18,7 +18,7 @@ export type ConversationRoleType = typeof ConversationRoleType[keyof typeof Conv
 export const NotificationType = {
     FRIEND_REQUEST: "friend_request",
     ACCEPTED_FRIEND_REQUEST: "accept_friend_request",
-    DENIED_FRIEND_REQUEST: "deny_friend_request", // Fixed to match backend
+    REJECTED_FRIEND_REQUEST: "reject_friend_request",
 } as const;
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
 

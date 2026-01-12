@@ -15,7 +15,7 @@ export interface RegisterData {
 export interface AuthResponse {
   userId: string;
   username: string;
-  email: string; // Add email
+  email?: string; // Email is not returned by login/refresh anymore
   accessToken: string;
   refreshToken?: string;
 }

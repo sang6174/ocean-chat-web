@@ -25,7 +25,11 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     try {
       await login({ username, password });
     } catch (err) {
-      setError('Login failed. Please check your credentials.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Login failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }

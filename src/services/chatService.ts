@@ -193,14 +193,14 @@ export const chatService = {
       const recipient = userMap.get(n.recipientId);
 
       // Map backend notification type to frontend type
-      let frontendType: 'friend_request' | 'accept_friend_request' | 'deny_friend_request';
+      let frontendType: 'friend_request' | 'accept_friend_request' | 'reject_friend_request';
 
       if (n.type === NotificationType.FRIEND_REQUEST) {
         frontendType = 'friend_request';
       } else if (n.type === NotificationType.ACCEPTED_FRIEND_REQUEST) {
         frontendType = 'accept_friend_request';
-      } else if (n.type === NotificationType.DENIED_FRIEND_REQUEST) {
-        frontendType = 'deny_friend_request';
+      } else if (n.type === NotificationType.REJECTED_FRIEND_REQUEST) {
+        frontendType = 'reject_friend_request';
       } else {
         return null; // Unknown type
       }
@@ -266,14 +266,14 @@ export const chatService = {
       const recipient = userMap.get(n.recipientId);
 
       // Map backend notification type to frontend type
-      let frontendType: 'friend_request' | 'accept_friend_request' | 'deny_friend_request';
+      let frontendType: 'friend_request' | 'accept_friend_request' | 'reject_friend_request';
 
       if (n.type === NotificationType.FRIEND_REQUEST) {
         frontendType = 'friend_request';
       } else if (n.type === NotificationType.ACCEPTED_FRIEND_REQUEST) {
         frontendType = 'accept_friend_request';
-      } else if (n.type === NotificationType.DENIED_FRIEND_REQUEST) {
-        frontendType = 'deny_friend_request';
+      } else if (n.type === NotificationType.REJECTED_FRIEND_REQUEST) {
+        frontendType = 'reject_friend_request';
       } else {
         return null; // Unknown type
       }
@@ -303,9 +303,9 @@ export const chatService = {
     notificationId: string,
     targetUserId: string,
     targetUsername: string,
-    action: 'accept' | 'deny' | 'cancel'
+    action: 'accept' | 'reject' | 'cancel'
   ): Promise<void> {
-    const endpoint = action === 'accept' ? 'accept' : action === 'deny' ? 'deny' : 'cancel';
+    const endpoint = action === 'accept' ? 'accept' : action === 'reject' ? 'reject' : 'cancel';
 
     await apiClient.post(`/v1/notification/friend-request/${endpoint}`, {
       notificationId: notificationId,

@@ -15,6 +15,7 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(5);
 
   // ... (keep handleCreate and toggleUser same) ...
   const handleCreate = async () => {
@@ -29,7 +30,7 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
       await createConversation({
         type: selectedUsers.length === 1 ? 'direct' : 'group',
         participantIds: selectedUsers,
-        groupName: groupName.trim(),
+        name: groupName.trim(),
       });
       onClose();
     } catch (error) {
@@ -92,22 +93,30 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
           {availableUsers.length === 0 ? (
             <p className="user-list-empty">No users available</p>
           ) : (
-            availableUsers.map(user => {
+            availableUsers.slice(0, visibleCount).map(user => {
               const isFriend = existingDirectChatUserIds.has(user.id);
               // Simple check if friend request sent? (Assuming standard flow, we might not track 'sentRequests' purely here without context update, but let's stick to user request: "only non-friends can send")
 
               return (
                 <div
                   key={user.id}
-                  className="user-item"
+                  className={`user-item ${!isFriend ? 'opacity-75' : 'cursor-pointer hover:bg-gray-50'}`}
                 >
                   <div
                     className="user-item-content"
-                    onClick={() => toggleUser(user.id)}
+                    onClick={() => {
+                      if (isFriend) {
+                        toggleUser(user.id);
+                      }
+                    }}
+                    style={{ cursor: isFriend ? 'pointer' : 'default' }}
                   >
                     <Avatar name={user.username} size="md" />
                     <div className="user-info">
-                      <p className="user-name">{user.username}</p>
+                      <p className="user-name">
+                        {user.username}
+                        {!isFriend && <span className="text-xs text-gray-400 ml-2">(Not a friend)</span>}
+                      </p>
                       <p className="user-subtitle">{user.name}</p>
                     </div>
                   </div>
@@ -143,6 +152,16 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
                 </div>
               )
             })
+          )}
+          {availableUsers.length > visibleCount && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => setVisibleCount(prev => prev + 5)}
+                className="text-sm text-ocean-600 hover:text-ocean-700 font-medium"
+              >
+                Load more
+              </button>
+            </div>
           )}
         </div>
 

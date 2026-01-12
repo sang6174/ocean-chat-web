@@ -9,7 +9,7 @@ interface NotificationDropdownProps {
 }
 
 export function NotificationDropdown({ notifications }: NotificationDropdownProps) {
-    const { acceptFriendRequest, denyFriendRequest } = useChat();
+    const { acceptFriendRequest, rejectFriendRequest } = useChat();
 
     const handleAccept = async (notification: NotificationItem) => {
         try {
@@ -20,11 +20,11 @@ export function NotificationDropdown({ notifications }: NotificationDropdownProp
         }
     };
 
-    const handleDeny = async (notification: NotificationItem) => {
+    const handleReject = async (notification: NotificationItem) => {
         try {
-            await denyFriendRequest(notification.sender.id, notification.sender.username);
+            await rejectFriendRequest(notification.sender.id, notification.sender.username);
         } catch (error) {
-            console.error("Failed to deny friend request", error);
+            console.error("Failed to reject friend request", error);
         }
     };
 
@@ -58,10 +58,10 @@ export function NotificationDropdown({ notifications }: NotificationDropdownProp
                                             <Check size={16} /> Accept
                                         </button>
                                         <button
-                                            className="action-btn deny"
-                                            onClick={() => handleDeny(notif)}
+                                            className="action-btn reject"
+                                            onClick={() => handleReject(notif)}
                                         >
-                                            <X size={16} /> Deny
+                                            <X size={16} /> Reject
                                         </button>
                                     </div>
                                 )}

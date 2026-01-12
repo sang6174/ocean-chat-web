@@ -36,7 +36,11 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       alert('Registration successful! Please login.');
       onSwitchToLogin();
     } catch (err) {
-      setError('Registration failed. Username or email might already exist.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Registration failed. Username or email might already exist.');
+      }
     } finally {
       setLoading(false);
     }

@@ -14,12 +14,24 @@ export function AddParticipantsModal({ onClose }: AddParticipantsModalProps) {
   const { currentUser } = useAuth();
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(5);
 
   const conversation = (conversations || []).find(c => c.id === selectedConversation);
   const existingParticipantIds = conversation?.participants.map(p => p.userId) || [];
 
+  // Calculate friends based on existing direct conversations
+  const friendIds = new Set(
+    (conversations || [])
+      .filter(c => c.type === 'direct')
+      .flatMap(c => c.participants)
+      .map(p => p.userId)
+  );
+
+  // Filter: Not current user, not already in group, AND must be a friend
   const availableUsers = (users || []).filter(
-    u => u.id !== currentUser?.id && !existingParticipantIds.includes(u.id)
+    u => u.id !== currentUser?.id &&
+      !existingParticipantIds.includes(u.id) &&
+      friendIds.has(u.id)
   );
 
   const handleAdd = async () => {
@@ -63,9 +75,9 @@ export function AddParticipantsModal({ onClose }: AddParticipantsModalProps) {
 
         <div className="user-list">
           {availableUsers.length === 0 ? (
-            <p className="user-list-empty">No users available to add</p>
+            <p className="user-list-empty">No friends available to add</p>
           ) : (
-            availableUsers.map(user => (
+            availableUsers.slice(0, visibleCount).map(user => (
               <div
                 key={user.id}
                 onClick={() => toggleUser(user.id)}
@@ -81,6 +93,16 @@ export function AddParticipantsModal({ onClose }: AddParticipantsModalProps) {
                 )}
               </div>
             ))
+          )}
+          {availableUsers.length > visibleCount && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => setVisibleCount(prev => prev + 5)}
+                className="text-sm text-ocean-600 hover:text-ocean-700 font-medium"
+              >
+                Load more
+              </button>
+            </div>
           )}
         </div>
 
